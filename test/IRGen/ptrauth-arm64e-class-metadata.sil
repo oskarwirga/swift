@@ -1,0 +1,39 @@
+// RUN: %swift -swift-version 5 -target arm64e-apple-ios14.0 -parse-stdlib -parse-as-library %s -emit-ir -module-name test -Xcc -Xclang -Xcc -fptrauth-calls -Xcc -Xclang -Xcc -fptrauth-objc-isa | %FileCheck %s
+
+// REQUIRES: CPU=arm64e
+// REQUIRES: OS=ios
+
+// Crash 2 repro: On arm64e, the ObjC runtime authenticates class metadata
+// pointers (isa, superclass, class_ro) during class realization. Unsigned
+// pointers cause EXC_ARM_PAC_FAIL.
+//
+// Verify Swift IRGen signs these pointers using ptrauth with DA key (i32 2):
+// - isa (metaclass): discriminator 0x6AE1 (27361)
+// - superclass: discriminator 0xB5AB (46507)
+// - class_ro: discriminator 0x61F8 (25080)
+
+import Builtin
+
+class Base {
+  func baseMethod() {}
+}
+
+class Derived: Base {
+  override func baseMethod() {}
+}
+
+sil_vtable Base {}
+sil_vtable Derived {}
+
+// Metaclass isa pointer is signed with DA key (i32 2) and disc 0x6AE1 (27361)
+// CHECK: @"$s4test4BaseCMm" = {{.*}} %objc_class { ptr ptrauth (ptr @"OBJC_METACLASS_$__TtCs12_SwiftObject", i32 2, i64 27361,
+
+// Metaclass superclass pointer is signed with DA key (i32 2) and disc 0xB5AB (46507)
+// CHECK-SAME: ptr ptrauth (ptr @"OBJC_METACLASS_$__TtCs12_SwiftObject", i32 2, i64 46507,
+
+// Metaclass class_ro pointer is signed with DA key (i32 2) and disc 0x61F8 (25080)
+// CHECK-SAME: ptr ptrauth (ptr @_METACLASS_DATA__TtC4test4Base, i32 2, i64 25080,
+
+// Derived metaclass superclass points to Base metaclass, also signed
+// CHECK: @"$s4test7DerivedCMm" = {{.*}} %objc_class {
+// CHECK-SAME: ptr ptrauth (ptr @"$s4test4BaseCMm", i32 2, i64 46507,
