@@ -972,10 +972,15 @@ static void setPointerAuthOptions(PointerAuthOptions &opts,
                       SpecialPointerAuthDiscriminators::ValueWitnessTable);
   opts.ProtocolWitnesses =
     PointerAuthSchema(codeKey, /*address*/ true, Discrimination::Decl);
+  // On iOS 26.2+, the runtime authenticates associated type witnesses with
+  // autda (DA key), not autia (IA key). The ABI changed from code pointers
+  // to data pointers for associated type entries in witness tables.
   opts.ProtocolAssociatedTypeAccessFunctions =
-    PointerAuthSchema(codeKey, /*address*/ true, Discrimination::Decl);
+    PointerAuthSchema(dataKey, /*address*/ true, Discrimination::Decl);
+  // On iOS 26.2+, the runtime authenticates associated conformance witnesses
+  // with autda (DA key), not autia (IA key).
   opts.ProtocolAssociatedTypeWitnessTableAccessFunctions =
-    PointerAuthSchema(codeKey, /*address*/ true, Discrimination::Decl);
+    PointerAuthSchema(dataKey, /*address*/ true, Discrimination::Decl);
   opts.SwiftClassMethods =
     PointerAuthSchema(codeKey, /*address*/ true, Discrimination::Decl);
   opts.SwiftClassMethodPointers =
