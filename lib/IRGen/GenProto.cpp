@@ -1282,6 +1282,19 @@ static llvm::Value *emitWitnessTableAccessorCall(
     IGF.IGM.getAddrOfProtocolConformanceDescriptor(
                                              conformance->getRootConformance());
 
+  // Sign the conformance descriptor for passing as an argument to
+  // swift_getWitnessTable. The runtime authenticates this pointer with
+  // autda(DA, ProtocolConformanceDescriptor discriminator).
+  auto schema =
+      IGF.IGM.getOptions().PointerAuth.ProtocolConformanceDescriptorsAsArguments;
+  if (schema) {
+    auto authInfo = PointerAuthInfo::emit(
+        IGF, schema, nullptr,
+        PointerAuthEntity::Special::ProtocolConformanceDescriptorAsArgument);
+    conformanceDescriptor = cast<llvm::Constant>(
+        emitPointerAuthSign(IGF, conformanceDescriptor, authInfo));
+  }
+
   // Emit the source metadata if we haven't yet.
   if (!*srcMetadataCache) {
     // Witness table accesses only require abstract type metadata; this
@@ -1601,8 +1614,20 @@ public:
         IGM.getAddrOfProtocolConformanceDescriptor(&Conformance);
       if (isRelative)
         Table.addRelativeAddress(descriptor);
-      else
-        Table.add(descriptor);
+      else {
+        // On arm64e, the conformance descriptor stored in the witness table
+        // must be PAC-signed. The runtime authenticates it with
+        // autda(addr | (0xc6eb << 48)) where addr is the witness table address.
+        auto &schema =
+            IGM.getOptions().PointerAuth.ProtocolConformanceDescriptors;
+        if (schema) {
+          Table.addSignedPointer(
+              descriptor, schema,
+              PointerAuthEntity::Special::ProtocolConformanceDescriptor);
+        } else {
+          Table.add(descriptor);
+        }
+      }
     }
 
     /// A base protocol is witnessed by a pointer to the conformance
