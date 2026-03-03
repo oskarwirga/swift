@@ -1792,6 +1792,27 @@ public:
   }
   bool isValueWitness() const { return getKind() == Kind::ValueWitness; }
   bool isContextDescriptor() const;
+  /// Returns true for protocol requirement descriptor entities whose GOT
+  /// entries need PAC signing on arm64e. The runtime authenticates indirect
+  /// requirement references in witness table patterns.
+  bool isProtocolRequirementDescriptor() const {
+    switch (getKind()) {
+    case Kind::MethodDescriptor:
+    case Kind::MethodDescriptorInitializer:
+    case Kind::MethodDescriptorAllocator:
+    case Kind::MethodDescriptorDerivative:
+    case Kind::BaseConformanceDescriptor:
+    case Kind::AssociatedTypeDescriptor:
+    case Kind::AssociatedConformanceDescriptor:
+    case Kind::ProtocolRequirementsBaseDescriptor:
+      return true;
+    default:
+      return false;
+    }
+  }
+  bool isValueWitnessTable() const {
+    return getKind() == Kind::ValueWitnessTable;
+  }
   CanType getType() const {
     assert(isTypeKind(getKind()));
     return CanType(reinterpret_cast<TypeBase*>(Pointer));

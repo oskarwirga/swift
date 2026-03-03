@@ -3874,6 +3874,28 @@ static llvm::GlobalVariable *createGOTEquivalent(IRGenModule &IGM,
           /*storageAddress*/ gotEquivalent);
       gotEquivalent->setInitializer(signedValue);
     }
+  } else if (entity.isProtocolRequirementDescriptor()) {
+    // Protocol requirement descriptor pointers in witness table patterns
+    // need to be signed. The runtime authenticates all indirect requirement
+    // references with autda(addr | (0x7d4c << 48)).
+    auto schema = IGM.getOptions().PointerAuth.TypeDescriptors;
+    if (schema) {
+      auto disc = llvm::ConstantInt::get(IGM.Int64Ty, 0x7d4c);
+      auto signedValue = IGM.getConstantSignedPointer(
+          global, schema.getKey(), gotEquivalent, disc);
+      gotEquivalent->setInitializer(signedValue);
+    }
+  } else if (entity.isValueWitnessTable()) {
+    // Value witness table pointers in generic metadata patterns need to be
+    // signed. The runtime authenticates indirect VWT references with
+    // autda(addr | (0x2e3f << 48)).
+    auto &schema = IGM.getOptions().PointerAuth.ValueWitnessTable;
+    if (schema) {
+      auto disc = llvm::ConstantInt::get(IGM.Int64Ty, 0x2e3f);
+      auto signedValue = IGM.getConstantSignedPointer(
+          global, schema.getKey(), gotEquivalent, disc);
+      gotEquivalent->setInitializer(signedValue);
+    }
   }
 
   return gotEquivalent;
