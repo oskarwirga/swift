@@ -7095,8 +7095,9 @@ importName(const clang::NamedDecl *D,
 std::optional<Type>
 ClangImporter::importFunctionReturnType(const clang::FunctionDecl *clangDecl,
                                         DeclContext *dc) {
-  bool isInSystemModule =
-      cast<ClangModuleUnit>(dc->getModuleScopeContext())->isSystemModule();
+  bool isInSystemModule = false;
+  if (auto *clangUnit = dyn_cast<ClangModuleUnit>(dc->getModuleScopeContext()))
+    isInSystemModule = clangUnit->isSystemModule();
   bool allowNSUIntegerAsInt =
       Impl.shouldAllowNSUIntegerAsInt(isInSystemModule, clangDecl);
   if (auto imported =
@@ -7126,8 +7127,9 @@ Type ClangImporter::importVarDeclType(
                                             Impl.CurrentVersion))
       declType = Impl.getClangASTContext().getTypedefType(newtypeDecl);
 
-  bool isInSystemModule =
-      cast<ClangModuleUnit>(dc->getModuleScopeContext())->isSystemModule();
+  bool isInSystemModule = false;
+  if (auto *clangUnit = dyn_cast<ClangModuleUnit>(dc->getModuleScopeContext()))
+    isInSystemModule = clangUnit->isSystemModule();
 
   // Note that we deliberately don't bridge most globals because we want to
   // preserve pointer identity.

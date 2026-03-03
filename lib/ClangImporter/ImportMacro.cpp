@@ -52,7 +52,9 @@ parseNumericLiteral(ClangImporter::Implementation &impl,
 
 // FIXME: Duplicated from ImportDecl.cpp.
 static bool isInSystemModule(DeclContext *D) {
-  return cast<ClangModuleUnit>(D->getModuleScopeContext())->isSystemModule();
+  if (auto *clangUnit = dyn_cast<ClangModuleUnit>(D->getModuleScopeContext()))
+    return clangUnit->isSystemModule();
+  return false;
 }
 
 static std::optional<StringRef>

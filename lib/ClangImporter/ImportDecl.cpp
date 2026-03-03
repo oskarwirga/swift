@@ -125,7 +125,9 @@ struct AccessorInfo {
 } // end anonymous namespace
 
 static bool isInSystemModule(const DeclContext *D) {
-  return cast<ClangModuleUnit>(D->getModuleScopeContext())->isSystemModule();
+  if (auto *clangUnit = dyn_cast<ClangModuleUnit>(D->getModuleScopeContext()))
+    return clangUnit->isSystemModule();
+  return false;
 }
 
 static FuncDecl *
@@ -5506,8 +5508,10 @@ namespace {
                                 ObjCSelector selector, bool forceClassMethod,
                                 std::optional<AccessorInfo> accessorInfo) {
       assert(dc->isTypeContext() && "Method in non-type context?");
-      assert(isa<ClangModuleUnit>(dc->getModuleScopeContext()) &&
-             "Clang method in Swift context?");
+      // If the DeclContext is not from a Clang module, this is a Swift-originated
+      // method being re-imported via a -Swift.h header. Skip it.
+      if (!isa<ClangModuleUnit>(dc->getModuleScopeContext()))
+        return nullptr;
 
       // FIXME: We should support returning "Self.Type" for a root class
       // instance method mirrored as a class method, but it currently causes
@@ -6033,7 +6037,9 @@ namespace {
                             bool hasKnownSwiftName = true) {
       if (!importer::hasNativeSwiftDecl(decl))
         return false;
-      auto wrapperUnit = cast<ClangModuleUnit>(dc->getModuleScopeContext());
+      auto wrapperUnit = dyn_cast<ClangModuleUnit>(dc->getModuleScopeContext());
+      if (!wrapperUnit)
+        return false;
       swiftDecl = resolveSwiftDecl<T>(decl, name, hasKnownSwiftName,
                                       wrapperUnit);
       return true;
