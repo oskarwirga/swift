@@ -33,6 +33,7 @@
 #include "swift/AST/ProtocolConformanceRef.h"
 #include "swift/ABI/MetadataValues.h"
 #include "swift/Basic/Assertions.h"
+#include "llvm/IR/Constants.h"
 #include "llvm/IR/Module.h"
 
 using namespace swift;
@@ -267,8 +268,12 @@ llvm::Value *irgen::emitBuiltinStartAsyncLet(IRGenFunction &IGF,
   if (!deploymentAvailability.isContainedIn(
                                    IGF.IGM.Context.getSwift57Availability()))
   {
-    auto taskAsyncFunctionPointer
-                = cast<llvm::GlobalVariable>(taskFunction->stripPointerCasts());
+    // Strip pointer casts, and if it's a ConstantPtrAuth (for arm64e pointer
+    // authentication), unwrap it to get the underlying GlobalVariable.
+    auto *strippedFunction = taskFunction->stripPointerCasts();
+    if (auto *ptrAuth = dyn_cast<llvm::ConstantPtrAuth>(strippedFunction))
+      strippedFunction = ptrAuth->getPointer()->stripPointerCasts();
+    auto taskAsyncFunctionPointer = cast<llvm::GlobalVariable>(strippedFunction);
 
     if (auto taskAsyncID
           = IGF.IGM.getAsyncCoroIDMapping(taskAsyncFunctionPointer)) {
