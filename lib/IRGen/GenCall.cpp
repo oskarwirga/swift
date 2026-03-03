@@ -5070,6 +5070,27 @@ static void emitRetconCoroutineEntry(
   }
   llvm::Value *id = IGF.Builder.CreateIntrinsicCall(idIntrinsic, arguments);
 
+  // On arm64e, attach ptrauth metadata to the coro.id intrinsic so that
+  // CoroSplit can sign the resume function pointer in the ramp function.
+  // The metadata carries the key and discriminator for ptrauth.sign.
+  {
+    auto authPair = getCoroutineResumeFunctionPointerAuth(IGF.IGM, fnType);
+    auto &schema = authPair.first;
+    if (schema) {
+      auto disc = PointerAuthInfo::getOtherDiscriminator(IGF.IGM, schema,
+                                                          authPair.second);
+      auto *key = llvm::ConstantInt::get(IGF.IGM.Int32Ty, schema.getKey());
+      auto *mdKey = llvm::ConstantAsMetadata::get(key);
+      auto *mdDisc = llvm::ConstantAsMetadata::get(disc);
+      auto *mdAddrDiv = llvm::ConstantAsMetadata::get(
+          llvm::ConstantInt::get(IGF.IGM.Int1Ty,
+                                 schema.isAddressDiscriminated()));
+      auto *md = llvm::MDTuple::get(IGF.IGM.getLLVMContext(),
+                                     {mdKey, mdDisc, mdAddrDiv});
+      cast<llvm::Instruction>(id)->setMetadata("ptrauth.resume", md);
+    }
+  }
+
   // Call 'llvm.coro.begin', just for consistency with the normal pattern.
   // This serves as a handle that we can pass around to other intrinsics.
   auto hdl = IGF.Builder.CreateIntrinsicCall(
